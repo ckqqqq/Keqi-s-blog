@@ -1,0 +1,15 @@
+{{- $requested := replaceRE `(^|/)\d{4}-\d{2}-\d{2}-` "$1" (.Get 0) -}}
+{{- $matches := slice -}}
+{{- range site.RegularPages -}}
+  {{- $page := . -}}
+  {{- with .File -}}
+    {{- if eq (replaceRE `(^|/)\d{4}-\d{2}-\d{2}-` "$1" .Path) $requested -}}
+      {{- $matches = $matches | append $page -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- if eq (len $matches) 1 -}}
+  {{- (index $matches 0).RelPermalink -}}
+{{- else -}}
+  {{- errorf "Article identity must resolve uniquely: %s" $requested -}}
+{{- end -}}

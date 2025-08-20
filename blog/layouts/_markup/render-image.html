@@ -1,0 +1,13 @@
+{{- $url := urls.Parse .Destination -}}
+{{- $src := $url.String -}}
+{{- if not $url.IsAbs -}}
+  {{- $path := strings.TrimPrefix "./" $url.Path -}}
+  {{- if strings.HasPrefix $path "media/" -}}
+    {{- $src = $path | relURL -}}
+  {{- else -}}
+    {{- with or (.PageInner.Resources.Get $path) (resources.Get $path) -}}
+      {{- $src = .RelPermalink -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+<a class="article-image-link" href="{{ $src | safeURL }}" target="_blank" rel="noopener" aria-label="查看原图：{{ .Text }}"><img src="{{ $src | safeURL }}" alt="{{ .Text }}" loading="lazy" decoding="async"{{ with .Title }} title="{{ . }}"{{ end }}></a>

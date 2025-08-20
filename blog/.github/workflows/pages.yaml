@@ -1,0 +1,63 @@
+name: Deploy blog to GitHub Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check publication whitelist and privacy
+        run: node scripts/check-publication.mjs
+      - name: Install Hugo
+        env:
+          HUGO_VERSION: 0.166.0
+        run: |
+          curl --fail --location --retry 3 "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_${HUGO_VERSION}_linux-amd64.tar.gz" -o "$RUNNER_TEMP/hugo.tar.gz"
+          curl --fail --location --retry 3 "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_${HUGO_VERSION}_checksums.txt" -o "$RUNNER_TEMP/checksums.txt"
+          cd "$RUNNER_TEMP"
+          EXPECTED=$(awk -v filename="hugo_${HUGO_VERSION}_linux-amd64.tar.gz" '$2 == filename { print $1 }' checksums.txt)
+          test -n "$EXPECTED"
+          echo "$EXPECTED  hugo.tar.gz" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/hugo-bin"
+          tar -xzf hugo.tar.gz -C "$RUNNER_TEMP/hugo-bin" hugo
+          echo "$RUNNER_TEMP/hugo-bin" >> "$GITHUB_PATH"
+      - uses: actions/configure-pages@v5
+        id: pages
+      - name: Build
+        env:
+          HUGO_ENVIRONMENT: production
+          SITE_BASE_URL: ${{ steps.pages.outputs.base_url }}/
+        run: hugo --gc --minify --cleanDestinationDir --baseURL "$SITE_BASE_URL"
+      - name: Check published routes, feeds and assets
+        env:
+          SITE_BASE_URL: ${{ steps.pages.outputs.base_url }}/
+        run: node scripts/check-publication.mjs --output public
+      - name: Check illustrated articles and GIF assets
+        run: node scripts/check-session-images.mjs public
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment

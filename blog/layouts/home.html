@@ -1,0 +1,29 @@
+{{ define "main" }}
+<section class="intro" aria-labelledby="intro-title">
+  <div class="eyebrow"><span></span> A NOTEBOOK IN PROGRESS</div>
+  <p class="intro-kicker">技术有深度，成长有路径。</p>
+  <h1 id="intro-title">拾级而上，<br>把问题想<span class="accent">明白。</span></h1>
+  <div class="intro-bottom"><p>从系统底层到算法原理，沿着代码、论文与实验深入。<br>记录技术的来龙去脉，也保留结论的适用边界。</p><a href="#paths">选一条路径 <span aria-hidden="true">↘</span></a></div>
+</section>
+<section class="paths" id="paths" aria-labelledby="paths-title">
+  <div class="section-heading"><h2 id="paths-title">从这里开始</h2><span>THREE PATHS, ONE JOURNEY</span></div>
+  <div class="path-grid">
+    {{ range $index, $path := slice (dict "section" "infra" "number" "01" "label" "SYSTEMS & INFRASTRUCTURE" "title" "Infra" "description" "走进系统的底层，理解性能从哪里来。" "topics" "GPU / 推理系统 / 分布式" "symbol" "▤") (dict "section" "algorithms" "number" "02" "label" "ALGORITHMS & THINKING" "title" "算法" "description" "拆解问题的结构，让直觉变成可验证的解法。" "topics" "注意力 / 数学推导 / 验证" "symbol" "⌘") (dict "section" "categories" "number" "03" "label" "TOPICS & CONNECTIONS" "title" "技术专题" "description" "按问题找到笔记，把零散知识连成路径。" "topics" "架构 / 缓存 / 训练 / 评测" "symbol" "↗") }}
+    {{ with site.GetPage $path.section }}
+    <a class="path-card path-{{ $index }}" href="{{ .RelPermalink }}">
+      <div class="card-top"><span>{{ $path.number }} /</span><span class="card-symbol" aria-hidden="true">{{ $path.symbol }}</span></div>
+      <div class="card-label">{{ $path.label }}</div><h3>{{ $path.title }}</h3><p>{{ $path.description }}</p>
+      <div class="card-topics">{{ $path.topics }}</div>
+      <div class="card-bottom"><span>{{ if eq .Kind "taxonomy" }}{{ len .Data.Terms }} 个专题{{ else }}{{ len .RegularPages }} 篇笔记{{ end }}</span><span>进入专题 <span aria-hidden="true">↗</span></span></div>
+    </a>
+    {{ end }}{{ end }}
+  </div>
+</section>
+<section class="recent-notes" aria-labelledby="recent-title">
+  <div class="section-heading"><h2 id="recent-title">最近写下的</h2><a href="{{ "archives/" | relURL }}">全部笔记 ↗</a></div>
+  {{ range first 5 (where site.RegularPages "Section" "in" site.Params.mainSections).ByDate.Reverse }}
+  <a class="note-row" href="{{ .RelPermalink }}"><span class="note-section">{{ .CurrentSection.Title }}</span><div><h3>{{ .Title }}</h3><p>{{ .Description }}</p></div><time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "2006.01.02" }}</time><span aria-hidden="true">↗</span></a>
+  {{ end }}
+</section>
+<aside class="closing-note"><span>一步一阶，保持好奇。</span><a href="{{ "index.xml" | relURL }}">订阅 RSS ↗</a></aside>
+{{ end }}

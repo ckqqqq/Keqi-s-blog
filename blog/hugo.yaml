@@ -1,0 +1,43 @@
+baseURL: https://ckqqqq.github.io/blog/
+locale: zh-CN
+defaultContentLanguage: zh
+title: 拾阶 · 技术笔记
+theme: PaperMod
+enableRobotsTXT: true
+hasCJKLanguage: true
+pagination:
+  pagerSize: 10
+outputs:
+  home: [HTML, RSS, JSON]
+params:
+  description: 关于系统架构、推理引擎、缓存、算子与注意力算法的技术笔记。
+  author: ckqqqq
+  assets:
+    favicon: favicon.svg
+    safari_pinned_tab: favicon.svg
+  defaultTheme: light
+  ShowReadingTime: true
+  ShowBreadCrumbs: true
+  ShowCodeCopyButtons: true
+  ShowPostNavLinks: true
+  ShowToc: true
+  mainSections: [infra, algorithms, session]
+  math: true
+  label:
+    text: 拾阶 SHIJIE
+menu:
+  main:
+    - {name: 图文研讨, url: /session/, weight: 25}
+    - {name: Infra, url: /infra/, weight: 10}
+    - {name: 算法, url: /algorithms/, weight: 20}
+    - {name: 技术专题, url: /categories/, weight: 30}
+    - {name: 归档, url: /archives/, weight: 40}
+    - {name: 搜索, url: /search/, weight: 50}
+markup:
+  goldmark:
+    extensions:
+      passthrough:
+        enable: true
+        delimiters:
+          block: [['\\[', '\\]'], ['$$', '$$']]
+          inline: [['\\(', '\\)'], ['$', '$']]
