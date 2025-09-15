@@ -127,3 +127,69 @@ description: "按时间顺序汇总 SGLang / LMSYS 官方博客的十篇中文�
 - 阅读入口：[原文](https://www.lmsys.org/blog/2026-06-01-hetero-epd)
 
 ---
+
+## 2026-08-11 · 统一 Radix Cache：共享前缀，不共享复用边界
+
+**要解决的问题**：【文档声明】全 attention KV、滑动窗口 KV 和递归状态可以对应同一 token 前缀，却具有不同的安全复用边界。统一树结构需要保留这些区别。
+
+**阅读实现时抓住什么**：【推断：阅读方法】先看 token 拓扑与组件状态的分离，再追踪匹配、插入、锁定、逐出及多级存储的生命周期钩子。
+
+**复现与适用边界**：构造相同前缀但状态检查点不同的用例，验证系统没有把最长字符串匹配误当成所有组件均可复用。
+
+**来源与署名**：
+
+- 原文标题：Unified Radix Cache: One Tree for Hybrid Model Prefix Caching
+- 原作者：SGLang / LMSYS 原文作者（署名见来源页）
+- 资料日期：2026-08-11（沿用原始存档，未重新核验）
+- 阅读入口：[原文](https://www.lmsys.org/blog/2026-08-11-unified-radix-cache)
+
+---
+
+## 2026-08-19 · H20 推理优化：按负载选择服务配置
+
+**要解决的问题**：【文档声明】这篇资料围绕 H20 上的大模型服务，将 prefill、低延迟 decode、高吞吐和 KV 容量目标分别建模。
+
+**阅读实现时抓住什么**：【推断：阅读方法】从硬件约束进入并行拓扑，再阅读通信融合、路由形状、投机解码和重叠执行的配套调整。
+
+**复现与适用边界**：H20 可作为实验平台，但仍需满足原文的卡数、模型和主机条件。H100 与 H20 的计算/带宽比例不同，应分别测量，不能共用最优配置。
+
+**来源与署名**：
+
+- 原文标题：Pushing the Limits of Serving DeepSeek-V4-Pro
+- 原作者：SGLang / LMSYS 原文作者（署名见来源页）
+- 资料日期：2026-08-19（沿用原始存档，未重新核验）
+- 阅读入口：[原文](https://www.lmsys.org/blog/2026-08-19-deepseek-v4-pro-engine-optimization-h20)
+
+---
+
+## 2026-08-20 · Miles × Mooncake：把碎片化 Rollout 组织成批量 I/O
+
+**要解决的问题**：【文档声明】rollout 与训练分开后，tokens、mask、log probability、reward 和元数据要跨 worker 传递。大量小对象会放大传输管理成本。
+
+**阅读实现时抓住什么**：【推断：阅读方法】阅读字段布局、完整数据包发布、接收端重建与批量传输，明确何时可以认定一份样本已经完整。
+
+**复现与适用边界**：分别测吞吐和端到端训练等待时间，并保持 payload 结构一致；更高传输带宽不自动等于更快训练。
+
+**来源与署名**：
+
+- 原文标题：Mooncake for Miles: From Fragmented Rollout Data to Efficient Bulk I/O
+- 原作者：SGLang / LMSYS 原文作者（署名见来源页）
+- 资料日期：2026-08-20（沿用原始存档，未重新核验）
+- 阅读入口：[原文](https://www.lmsys.org/blog/2026-08-20-miles-mooncake-rollout-data-transfer)
+
+---
+
+## 2026-09-10 · V4.1 的引擎适配：跨层共享、Engram 与 Replay
+
+**要解决的问题**：【文档声明】这篇资料讨论跨层 KV 与索引复用、Engram 表布局、SWA bounded replay 以及训练/推理的数值匹配。
+
+**阅读实现时抓住什么**：【推断：阅读方法】从状态所有权和存活期阅读，特别检查压缩未完成的中间状态、跨层共享索引及恢复边界。
+
+**复现与适用边界**：bounded replay 是近似恢复，不能直接宣称与完整前向等价；评测配置、正确性探针和限制条件必须与性能数字一起阅读。
+
+**来源与署名**：
+
+- 原文标题：SGLang and Miles Add Day-0 Support for DeepSeek-V4.1
+- 原作者：SGLang / LMSYS 原文作者（署名见来源页）
+- 资料日期：2026-09-10（沿用原始存档，未重新核验）
+- 阅读入口：[原文](https://www.lmsys.org/blog/2026-09-10-deepseek-v41)
