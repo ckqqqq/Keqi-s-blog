@@ -270,3 +270,51 @@ in-flight 样本**是正在演进的策略生成的**：
 **【推断】** 两家没有统一答案，说明**异步 RL infra 还没有最佳实践** —— 这对想进入这个方向的人是好事。
 
 ---
+
+## 6. 可直接照做的清单
+
+```
+第 1 层：进程边界
+  □ rollout 移出可抢占的 GPU 训练池
+  □ 拆成 sandbox（跑 scaffold+工具）与 worker（scaffold-agnostic 控制层）
+  □ 定义 common trajectory schema
+
+第 2 层：调度
+  □ 全局完成样本计数器（不是 per-prompt 状态机）
+  □ 计数 ≥ GRPO group size 就派下一个 prompt（不管谁产出的）
+  □ in-flight 样本数上限作为主旋钮
+  □ per-dataset 并发限制（控长度偏置）
+
+第 3 层：正确性
+  □ 每个样本打"策略版本"标签 → 算 staleness
+  □ bound 最大 off-policy 比例（调度层）
+  □ token 级 loss masking（损失层）
+  □ MoE：拼接各段专家路由，不重算
+  □ 长度偏置：早期丢弃短样本（阈值锚定任务预期，不跟随策略漂移）
+
+第 4 层：中断/恢复
+  □ token 级中断
+  □ token 粒度持久化 KV cache + 专家路由
+  □ 样本级 GC（完成即释放）
+
+第 5 层：扩展
+  □ 多 scaffold 联合训练（依赖第 1 层抽象）
+  □ 多 run 模型合并扩展有效算力
+  □ 配置版本化（OPD 动态重配置必需）
+```
+
+---
+
+## 7. 证据缺口与不确定
+
+1. **V4.1 没给任何量化数据** —— 没有 rollout 效率提升幅度、off-policy 比例上限、staleness mask 阈值、丢弃短样本的比例与持续步数。**只有机制，没有数字。**
+2. **token 级 staleness 下 advantage 是否仍无偏，报告未讨论** —— 我认为这是一个理论空白。
+3. **模型合并的具体方法未给**（权重平均？任务算术？）—— 只说 "model merging"。
+4. **§3.2 的"正反馈放大"是我的推断** —— 论文只说 "prevent overfitting to overly short sequences"，**没有明确描述回路**。我认为 "overfitting" 一词支持这个解读，但这是推理而非原话。
+5. **另一个可能解释**：早返回的短样本可能包含"被 max_tokens 截断"或"提前 EOS"的**低质量**样本。**【无法确认】** —— 报告未提；但若你自建系统，**值得统计早返回短样本里异常终止的比例**。
+6. **参考实现**：`slime`是 GLM 系列的 RL 框架，README 自述 "the RL framework behind GLM-5.3 / 5.2 / 5.1 / 5.0 / 4.7 / 4.6 / 4.5"，走 **Megatron + SGLang** 路线，可作对照实现。
+
+
+## 文献版本说明
+
+本文所引 DeepSeek-V4.1-Flash 技术报告为原笔记记录的 2026-09-10、51 页版本（文件名 `DeepSeek_V41_Tech_Report.pdf`），页码对应这一版本。本次整理未获得可独立确认的公开下载链接，未将 PDF 打包进本站；涉及该报告的数值沿用原笔记，仍需对照原文复核。
