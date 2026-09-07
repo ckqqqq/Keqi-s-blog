@@ -508,3 +508,104 @@ acc = tl.dot(p.to(tl.bfloat16), kc, acc=acc)
    → **加 FP4 存储格式是反量化 kernel 问题（中等门槛）；加 FP4 MMA 需要新的 `kind::f8f6f4` atom，完全是另一个量级。**
 
 ---
+
+## 7. 实现前提与正确性检查
+
+### 7.1 内核实现的技术前提
+
+**第一层：CUDA C++ 与内存层级（必需，不可跳过）**
+`__shared__` 布局与 bank conflict 定量分析 —— FlashMLA 有教科书级案例：`dequant_utils.cuh:74-90` 注释讨论 "8 threads per token cover one swizzle-atom column ... so the STS.128 of a wavefront (8 lanes) is conflict-free"，以及 fp4 行 pad 32 B 让 LDS.32 落在 32 个 bank 的不同 quarter。Swizzle 布局（SW128/SW64/SW32）与 `GMMA::Layout_K_SW128_Atom` / `UMMA::Layout_K_SW128_Atom`。`__ldg` / 128-bit 向量化载入 / cache hint —— FlashMLA 自定义了 `load_128b_from_gmem<T, L1CacheHint::EVICT_LAST, L2PrefetchHint::B256>`（`sm90/decode/sparse/splitkv_mla.cuh:584`）；竞赛侧只用 `cache_modifier=".cg"` + `eviction_policy`（`sparse_fused.py:91-92`）。
+
+**第二层：异步与同步原语（Hopper 的门槛在这里）**
+TMA / `cp.async.bulk.tensor` 与 `CUtensorMap`（`sm100/decode/sparse/head64/config.h:93-108` 定义 5 张 tensormap）。`tma_gather4`（`fwd_for_small_topk/head128/config.h:83-90` 讨论 `QUANT_PART_MAP_DIM0` 如何让 box 越过 fp8 边界预取 bf16 尾部）。`mbarrier` / `ClusterTransactionBarrier` / `NamedBarrier`（`sm90/decode/dense/splitkv_mla.cuh:779-920` 的 `sScale0Ready→sScale1Ready→sP0Ready→rO1sP0sV0RIssued` 四阶段）。`st.async`（DSM）+ CTA Cluster。**PTX 内联汇编**（`sm90/prefill/sparse/phase1.cuh:14-20` 的 `st.weak.global.cs.v4.f32`；`:34-41` 的 `cp.reduce.async.bulk.global.shared::cta.bulk_group.add.f32` —— **用 TMA 做 global 端原子加法替代 `atomicAdd`**，很高级）。寄存器重配 `warpgroup_reg_dealloc<152>()`。Programmatic Dependent Launch。
+
+**第三层：Tensor Core 编程模型（最陡的一段）**
+SM90 `wgmma`：`GMMA::ss_op_selector` / `rs_op_selector`、K-major vs MN-major。**SM100 `tcgen05` / UTCMMA —— 完全不同的编程模型**，需理解：TMEM（Tensor Memory，独立地址空间）`cute::TMEM::Allocator1Sm().allocate(512, ...)`；`SM100_MMA_F16BF16_2x1SM_SS_NOELECT` / `_TS_`（2-SM 协同 MMA，TS = A 在 TMEM，SS = A 在 SMEM）；**TMEM 列预算规划**（`head128/config.h:35-42` 把 512 列规划为 `0~256=O, 256~320=P, 320~512=Q`）；UMMA Major 与 SM100 swizzle atom；**CLC（Cluster Launch Control）持久化调度**；`cta_group::2`。**CUTLASS / CuTe**：`make_tiled_mma`、`tile_to_shape`、`local_tile`、`partition_fragment_C`、`flat_divide`、`composition`、`cute::gemm` —— 整个 `sm100/prefill/dense/` 就是 CUTLASS 的 fork。**Triton**：`tl.dot`、`tl.make_block_ptr`、`num_warps/num_stages` 调优、`tl.atomic_add(..., sem="release")` + volatile load 的 spin barrier。
+
+**第四层：数值与验证**
+`float → orderable uint` 的单调映射（radix select 前提）：`topk.cuh:140-151` 的 `(bits & 0x8000) ? ~bits : (bits | 0x8000)`。online softmax 数值陷阱：`(-inf)-(-inf)=NaN` —— FlashMLA 用 `MAX_INIT_VAL = -1e30` 规避；竞赛用 `tl.where(m_i == NEG_INF, 0.0, ...)`。base-2 换底：`exp2` + `scale*LOG2E`。FP8 量化粒度与 scale 布局：per-128(V3.2)/per-64(V4)/per-32(V4.1)/per-16(fp4)，`fp32` vs `e8m0` vs `e4m3`（`kv_cache_format.h:8-28`），参考实现 `tests/quant.py`（303 行）。**正确性测试基建**：`tests/kernelkit/` 提供 `check_is_bitwise_equal` / `check_is_allclose` / `get_cos_diff`、`LowPrecisionMode` 上下文、`non_contiguousify`。**Profiling**：Nsight Compute —— 竞赛 Table 5 与 Figure 1 完全建立在 NCU 计数器上，命令是 `--set roofline`。
+**★数值细节**：`core_attn/kernel.cuh:19` 的 `O_QUANT_CLAMP_MIN_VALUE = 1e-4`，在算 `sf = absmax/448.0` 前 clamp 住 absmax，**防止整块输出全零时除零**。这类细节正是"照着公式重写就会在边界输入上发散"的原因。
+
+**第五层（竞赛特有的元技能）**
+**读懂 workload 分布** —— `report.pdf` p3 §6.3 那句值得背下来："the agent reasoned over the kernel's code, not over the kernel's inputs"。**理解测量口径** —— `run_eval.py:44-51` 说明 CUDA events 比 CUPTI 多算 2–4 us/call，在 9 us kernel 上是 20–40%。**知道什么时候该用别人的 kernel** —— 冠军的 top-k 是 FlashInfer FilteredTopK 的剪枝版，不是自己写的。
+
+### 7.2 门槛的真正位置（★重要结论）
+
+> **门槛不在"写 `tcgen05.mma`"**（6 个 asm 块已经有人写好了，且其中 2 个甚至是死代码）。
+> **而在"编排 4 个 warpgroup、11 条 mbarrier pipeline、512 列 TMEM 预算"** —— 这正是 `core_attn/config.h:1-67` 与 `sm100_fmha_bwd_kernel_tma_warpspecialized.hpp`（1,835 行）所代表的东西。
+>
+> **这是系统工程能力，不是指令级能力。** 因此**现实的入门点是"一个新的实例化 / 新配置"，不是"一个新的 MMA"。**
+
+### 7.4 正确性检查项
+
+| # | 改动 | 门槛 |
+|---|---|---|
+| 1 | `sparse_fused.py` 加 `tl.static_assert(BLOCK_N <= SPLIT_SIZE)` | **低**（修有文档记录的崩溃；`NUM_SPLITS=32` → gather 索引 **4095 > 2047**，已复算） |
+| 2 | 恢复 top-k overflow 兜底 / 让 `topk.cuh:367` 静默 clamp 变响 | **低**（`:126-127` 注释还在谎称安全网存在） |
+| 3 | 补 `top_k <= FILTERED_TOPK_MAX_K` 保护 | **低** |
+| 4 | dense 的 `std::cout` → `TORCH_CHECK`（`fmha_cutlass_fwd_sm100.cu:74-77`、`bwd .cu:75-77`） | **低**（~5 行，消除静默错答） |
+| 5 | 让 `MaskMode::kNone/kCustom` **被大声拒绝** | **低**（~5 行）；若要真正**实现** `kNone` 则需串联 `NoMask` 并复验 MLA mainloop → **中** |
+
+上表涉及**正确性约束**；代码审查可以离线完成，但运行内核和复验修复仍需对应 GPU 环境，正对应 `report.pdf` p3 §6.2 中作者反复强调、AI agent 最缺的那一环："**stop, that's still doing useless work, remove it**"。
+
+---
+
+## 8. 证据附录（文件:行号）
+
+### 8.1 契约与语义
+`flash_mla_interface.py:53-70, :73-111, :85-90, :118, :124-158, :160-179, :291-293`；`tests/ref.py:70-99, :75-77, :102-103`。
+
+### 8.2 布局
+`kv_cache_format.h:8-28, :33-43, :45-48`；`sm90/decode/sparse/components/config.h:12-19`；`params.h:3-8, :10-17, :69+`。
+
+### 8.3 调度与 split-KV
+`get_decoding_sched_meta.cu:64-105`；`combine.cu:36-38, :57-59, :165-190`；`sparse_decode.cpp:71, :108, :147, :198, :268`。
+
+### 8.4 硬约束
+`sparse_decode.cpp:274, :275-276, :338, :359-365, :400-418`；`dense_decode.cpp:25-26, :65`；`sparse_prefill.cpp:107-109, :125-126`；`head64/config.h:30`；`core_attn/config.h:63, :66-67`；`fwd_for_small_topk/head128/config.h:63`；`fmha_cutlass_fwd_sm100.cu:46-47, :50-61, :74-77`；`fmha_cutlass_bwd_sm100.cu:75-77`。
+
+### 8.5 SM90
+`dense/config.h:5-11`；`dense/traits.h:20-21, :31-53`；`dense/splitkv_mla.cuh:47, :383-384, :456-457, :635, :779-920, :960`；`sparse/splitkv_mla.cuh:93, :456, :460-461, :584-597, :606-621, :669, :681, :757-758, :769-776`；`prefill/sparse/phase1.cuh:14-20, :34-41`；`prefill/sparse/config.h:29, :58-70`。
+
+### 8.6 SM100
+`head64/kernel.cuh:1-14, :72`；`head64/config.h:60-72, :93-108`；`dequant_utils.cuh:20-35, :74-90`；`fwd/head128/config.h:27-35, :117-127`；`core_attn/config.h:1-67, :240`；`core_attn/kernel.cuh:19, :242-245, :322, :345, :373-393, :402-421, :432, :469, :507, :543-560, :585-600, :1450, :1467`；`common/helper.h:64-70`；`common/fmha_fusion.hpp:41, :83, :135, :191, :280, :316`；`common/pipeline_mla.hpp:71-108, :172`。
+
+### 8.7 kerutils
+`gemm.cuh:18-78, :80-111, :106, :117, :182-212, :207, :217, :301, :307, :314, :409, :415, :422, :431, :493-527, :533, :596-628, :633, :649`；`intrinsics.cuh:16, :30, :44-53, :58-101, :104, :114-123, :126, :138, :152, :185-196, :201-212, :220-260, :263-270, :276, :279, :310-527, :582`；`helpers.cuh:18, :54, :78-135, :95, :120, :128, :129`；`tma_cta_group2_nosplit.cuh:10, :24-27, :36, :49-51, :61, :74-76, :86, :99-101, :111, :124-126, :136, :185-191, :193-201, :207-221, :228, :232-237, :244-250`；`device/common.h:56-66`。
+
+### 8.8 TODO/FIXME 全部 22 处
+`params.h:21`；`sm90/decode/dense/splitkv_mla.cuh:1038-1045`；`sm100/.../fwd/head64/phase1.cuh:194`；`fwd/head64/config.h:71`；`fwd/head128/phase1.cuh:226`；`core_attn/kernel.cuh:345, :469`；`kerutils/.../sm100/helpers.cuh:10, :46`；`kerutils/.../sm80/intrinsics.cuh:86, :147`；`setup.py:39`；`tests/test_fused_norm_rope_attn_rope_cast.py:206`；`tests/quant.py:185, :266`；`flash_mla_interface.py:291`。
+
+### 8.9 竞赛仓库
+`report.pdf` p0（abstract/Eq.1/§2 trace 数）、p1（§3.1 打分、§3.2 radix）、p2（Table 2/3/4、§4.1/§4.2、§5 roofline 分析）、p3（Table 5/6、Figure 1、§6.1-6.4）、p4（References）；`README.md:5, :7, :21-22`；`config.toml:2-10, :12-21`；`indexer_fused.py:17-20, :81, :120-122, :125-208, :173-191, :198-205, :211-212, :215-237, :240-254, :265, :290-291, :303-307`；`sparse_fused.py:8, :16, :19-174, :50, :71-72, :78-84, :89-106, :117-127, :130-131, :137, :177-274, :219-220, :255-257, :277-290, :301-306, :312-314, :327-328, :332-350, :356-377`；`topk.cuh:17-28, :53-60, :61-120, :123-127, :140-155, :156-159, :181-186, :205-214, :217-222, :226-230, :235-303, :266-280, :284-289, :305-393, :325-327, :347-364, :365-392, :390-391, :395-402, :406-421, :424-461`；`topk_binding.cu:37-38, :52-61, :64-80, :87-90`；`topk_ext.py:12, :16-19, :26, :29-34, :69, :85-92`；`run_eval.py:19, :21-22, :29-34, :36-37, :44-55, :57-60, :70-78, :84-92, :125-140, :177, :212-221, :250, :254-266`；`pack_solution.py:46-74`。
+V3.2 参考实现：`DeepSeek-V3.2-Exp/inference/kernel.py:530-636`；`model.py:435-487`；`DeepSeek_V3_2.pdf` p0 Eq.1-2、p1 "Instantiate DSA Under MLA"、p3 §3。
+
+### 8.10 统计命令
+`git rev-list --count HEAD`=64；`git shortlog -sne HEAD`=22；`find csrc -name "*.cu" | wc -l`=51；`grep -rn "__global__" csrc | wc -l`=13；`grep -rn "kind::" csrc/`=6（全 `f16`）；`grep -rniE "e4m3|e5m2|e2m1|e8m0|nvfp4|mxfp" csrc/kerutils/include/kerutils/device/sm100/`=0；`grep -rn "tcgen05" csrc/kernels/sm100/prefill/dense/`=0；`grep -rn "2Sm|2SM|cta_group" csrc/kernels/sm100/prefill/dense/`=0。
+
+---
+
+## 9. 无法确认清单
+
+1. `report.pdf` 中 37.07x 的**逐 workload 分解**（只给均值未给分布，且仓库无任何结果产物）
+2. 37.07x 是对 151 条 trace 求均值还是两个 track 均值的平均
+3. **baseline 究竟是谁**（report 称 FlashInfer，`run_eval.py:87` 称 PyTorch）
+4. 竞赛完整容差规格（`EVALUATION.md` 不在仓库；已知 `rtol/atol=0.01`）
+5. 评测器是否要求 LSE 为自然对数
+6. FlashMLA 在 B200 上的 dense decode 性能（**该内核在 SM100 上不存在**，无法测量）
+7. `docs/20250422` 的 seesaw 调度是否计划用于 SM100
+8. `csrc/kerutils` 的 upstream 版本差异（upstream 不在本机）
+9. DeepSeek-V4.1 的模型规格（只有 README 的 KV cache 布局描述）
+10. Triton 后端是否把 block pointer 载入降级为 `cp.async`/TMA
+11. CUTLASS 内部 PTX（`csrc/cutlass` submodule 未检出）
+12. `Sm100MmaPeerBitMask` 的具体值（定义在缺失的 CUTLASS 头里）
+13. TMA 是否会对单个 box 二次切分（**无法确认**；代码证明的是"每个 CTA 各自发起自己那一半、完成字节经 peer-bit 清零地址记到 CTA0 的 mbarrier"）
+
+---
+
+
+## 文献版本说明
+
+本文所引 DeepSeek-V4.1-Flash 技术报告为原笔记记录的 2026-09-10、51 页版本（文件名 `DeepSeek_V41_Tech_Report.pdf`），页码对应这一版本。本次整理未获得可独立确认的公开下载链接，未将 PDF 打包进本站；涉及该报告的数值沿用原笔记，仍需对照原文复核。
+
+上游入口：[FlashMLA](https://github.com/deepseek-ai/FlashMLA)，原笔记分析版本为 `ba89a34`。
