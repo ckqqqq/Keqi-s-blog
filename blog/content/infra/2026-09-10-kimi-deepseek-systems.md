@@ -288,3 +288,33 @@ Kimi 把 block size 从"被迫 1024–6144"压回到"hash 512 / 物理块粗分�
 > - **等得久 → 新战场**（沙箱 98% 在等、rollout 长尾、auto-throttling）
 
 ---
+
+## 5. 必须说清楚的证据缺口
+
+1. **我不了解两家的内部路线图**。本文全部基于**公开论文 + 源码**。他们"未来会押注什么"**本质上是推断**，不是事实。
+2. **Kimi K3 的 infra 数字未经复现验证**（51M 沙箱、6.5× 超分、133/49 ms、2.5× scaling efficiency 全部引自论文）。
+3. **DeepSeek 的 890 B/token 口径无法从报告确认**——`tests/quant.py` 里 `V41_FP8Sparse` 主 KV 是 528 B/token，加 FP4 `extra_kv` 288 B/token，对不上 890。**【核验】我算不出来，报告也没给推导。**
+4. **两家是否真的会继续这两条路线**：可能的变数——
+   - DeepSeek 是否会转向线性注意力？**无法确认**（只看到他们引用了 PowerAttention）
+   - Kimi 的 KDA 是否会在更大规模暴露问题？**无法确认**
+5. **我没有 Kimi 的源码级尽调**（不像 DeepSeek 有本地 6 个仓库）。**MoonEP 和 AgentENV 可以作为补做的起点。**
+6. **"哪家 infra 更强"我无法判断** —— 两家的报告都是自述，没有第三方基准。
+
+---
+
+## 附：文献与核验
+
+| 内容 | 来源 |
+|---|---|
+| Kimi K3 技术报告 | arXiv:2607.24653v2（2026-08-07 修订，47 页） |
+| Kimi K2.5 | arXiv:2602.02276v2 |
+| MoonEP | `github.com/MoonshotAI/MoonEP`｜1131★｜MIT｜创建 2026-07-24 |
+| AgentENV | `github.com/kvcache-ai/AgentENV`｜3465★｜Rust｜创建 2026-07-23｜推送 2026-09-15 |
+| KDA CP 实现 | FLA PR #691（论文脚注 2） |
+| DeepSeek V4.1 | `DeepSeek_V41_Tech_Report.pdf`（51 页） |
+| DeepEP 缺口 | `deep_ep/buffers/elastic.py:750, :755-757`（源码核验） |
+
+
+## 文献版本说明
+
+本文所引 DeepSeek-V4.1-Flash 技术报告为原笔记记录的 2026-09-10、51 页版本（文件名 `DeepSeek_V41_Tech_Report.pdf`），页码对应这一版本。本次整理未获得可独立确认的公开下载链接，未将 PDF 打包进本站；涉及该报告的数值沿用原笔记，仍需对照原文复核。
