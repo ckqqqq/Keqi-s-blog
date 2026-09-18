@@ -192,3 +192,33 @@ grep -niE "\bRSI\b|recursive self|self-improv|self-evolv|self-play|self-reward|a
 👉 **这是我认为整个 V4.1 生态里最重要的"自我认知"**：他们知道自改进的瓶颈不在生成能力，而在**对真实分布的观察能力**。
 
 ---
+
+## 四、四条线的层级关系（我的归纳）
+
+论文实际上在四个层次上分别做"自改进"，且**只有第二层是明确声称的**：
+
+```
+① 数据/任务层   模型自造任务 + 自审计 + 失败回放        ← §5.1.1 明确声称
+② 后训练层      RL + OPD（多 teacher 蒸馏）             ← §5.2.4 明确声称
+③ 环境层        DSec：百万级并发沙箱                    ← §5.1.3 基础设施
+④ Harness 层    DSH 的 Minimal/Standard/PTC + 跨 scaffold 联合训练  ← §5.3.4
+```
+
+**【推断，必须标注为推断】** 把 ① 和 ④ 合起来看，就是一个"模型参与塑造自己训练环境与交互协议"的方向。但论文**从未把它表述为 RSI 或自进化**，只说 model–harness **co-design**。
+
+**为什么这个区分重要**：如果你要引用"DeepSeek 在做 RSI"，**论文里没有这个主张**。准确的说法是"**DeepSeek 在做自改进的数据引擎 + 模型-harness 协同设计，并明确否认算法创新**"。
+
+---
+
+## 六、无法确认 / 需注意
+
+1. **下一代架构完全未知**。论文只说"a new starting point for our continued scaling efforts"，**没有透露任何架构方向**。
+2. **§5.1.1 的"iteratively train the model to construct better tasks"具体怎么实现，报告没给细节**（没给数据量、没给迭代轮数、没给质量提升曲线）。
+3. **"essentially all of the observed gains 来自数据"这个论断没有消融实验支撑**（至少报告里没给）。**【推断】** 这是一个强主张，但读者只能信，不能验。
+4. **我不确定 DeepSeek 是否在内部讨论 RSI** —— 只能说**公开报告里零提及**。
+5. **竞赛报告与 V4.1 报告是不同作者群**（竞赛方案是单作者 Doğaç Eldenk / Northwestern，"Human-AI collaboration"），我把它和 §5.1.1 并列是**我的推断**，不是论文的原话。
+
+
+## 文献版本说明
+
+本文所引 DeepSeek-V4.1-Flash 技术报告为原笔记记录的 2026-09-10、51 页版本（文件名 `DeepSeek_V41_Tech_Report.pdf`），页码对应这一版本。本次整理未获得可独立确认的公开下载链接，未将 PDF 打包进本站；涉及该报告的数值沿用原笔记，仍需对照原文复核。
