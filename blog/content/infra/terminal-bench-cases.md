@@ -31,3 +31,12 @@ description: "区分任务难度变化、运行预算变化和判分协议变化
 - 2.0：[filter-js-from-html](https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/main/filter-js-from-html/instruction.md)｜[query-optimize](https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/main/query-optimize/instruction.md)（[toml](https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/main/query-optimize/task.toml)）｜[pytorch-model-recovery](https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/main/pytorch-model-recovery/instruction.md)（[toml](https://raw.githubusercontent.com/harbor-framework/terminal-bench-2/main/pytorch-model-recovery/task.toml)）
 - 3.0：[bun-sourcemap-leak](https://raw.githubusercontent.com/harbor-framework/terminal-bench/v3.0.0/tasks/bun-sourcemap-leak/instruction.md)｜[wal-recovery-ordering](https://raw.githubusercontent.com/harbor-framework/terminal-bench/v3.0.0/tasks/wal-recovery-ordering/instruction.md)（[toml](https://raw.githubusercontent.com/harbor-framework/terminal-bench/v3.0.0/tasks/wal-recovery-ordering/task.toml)）｜[sglang-qwen-burst](https://raw.githubusercontent.com/harbor-framework/terminal-bench/v3.0.0/tasks/sglang-qwen-burst/instruction.md)（[toml](https://raw.githubusercontent.com/harbor-framework/terminal-bench/v3.0.0/tasks/sglang-qwen-burst/task.toml)）
 - 4.0：同三名题在 v4.0.0 标签下逐字复在，配置差异见下节；[v4.0.0 目录](https://github.com/harbor-framework/terminal-bench/tree/v4.0.0/tasks)
+
+## 难度变化说明
+
+三个 case 槽位讲的是同一个故事，比单题更有说服力：
+
+1. **1.0 → 2.0：难度不变，协议收紧。** 2.0 的 89 题大量沿用 1.0 题面（`filter-js-from-html` 逐字相同），专家估计仍在 **15–60 分钟**档；变化在工程侧：环境钉固定镜像、verifier 超时放大、元数据补齐。
+2. **2.0 → 3.0：题目难度跳一个数量级。** 专家耗时估计从"分钟档"（15/45/60 min）跳到**"小时档"（1.5 / 2 / 6 h）**；题面从"3–4 条行为要求"变成"十余条互相耦合的行为约束 + 禁止清单（禁 subprocess/eval/except-pass/写盘/新增依赖）+ 性能上界（禁 quadratic）"。约束之间会互相打架（功能保持 × 泄露封死 × 不乱序 × 不许慢），没有局部正确的捷径——这是 3.0 头部从 83.8% 掉到 34.4% 的题面级解释（原笔记记录，未重新核验）。
+3. **3.0 → 4.0：题不变，预算统一放到 8 h。** 三道题题面逐字相同；agent 超时一律 28800 s，资源翻倍（2 CPU / 4–8 GB）。值得注意的是 verifier 超时反而收窄（wal 7200→1800 s、sglang 7200→420 s）——**给 agent 更多时间，给判分更少时间**，说明 4.0 的预期是"长程作业 + 快速判定"。【推断】
+4. **领域分布也在变**：1.0/2.0 以"单点脚本任务"为主（装环境、编译、单条 SQL）；3.0/4.0 出现 LLM 基础设施题（`sglang-qwen-burst`、`vllm-deepseek-streaming`、`fp8-rmsnorm-gemm`）、CAD/EDA 题（`freecad-*`、`cad-model`）、形式化证明题（`lean-midpoint-proof`、`coq-block-bound`）——题库从"通用运维"转向"专家领域长程任务"（4.0 删掉的 8 题：`cli-2ph-simplex`、`erp-procurement-planning`、`exam-pdf-eval`、`fix-uautomizer-soundness`、`gpt2-codegolf`、`ico-path-patch`、`lean-midpoint-proof`、`memcached-backdoor`，目录比对见抓取记录）。
