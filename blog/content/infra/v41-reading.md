@@ -107,3 +107,22 @@ V4.1 方案:
 - **长度偏置**:异步下短样本先完成主导早期 batch → dispatcher 限流 + 丢弃过早短样本【p31】;off-policy → 上限 + loss masking 剔除高 staleness token【p31】
 - **OPD**:**超过 40 个架构异构的 teacher** 全词表蒸馏,teacher 切换近乎零成本【p31-32】
 - **多智能体**:DSH Agent Team(spawn_teammate/共享任务板/derived-latency 惩罚——按关键路径计费,鼓励并行);每个 wall-clock deadline 上多智能体均优于单智能体(ProgramBench 8h:30.04% vs 20.39%)【p35-36,标注为初步结果】
+
+## 七、作者承认的局限(原文照录)
+
+1. 【p37】"no finite test suite can cover every extreme input and deployment condition. Potential selection errors in CSA2 and approximate state reconstruction in SWA Bounded Replay may still cause capability degradation in untested boundary cases."
+2. 【p37】"this parity does not imply that the model matches the frontier capabilities of leading closed-source systems on complex, high-difficulty reasoning and edge cases."
+3. 【p6】科学向 agentic 任务(Terminal-Bench 4.0)与巨型模型仍有差距;多模态整体落后于闭源巨型系统
+4. 【p32-33】评测基建易被 gaming(观察到反编译 Ubuntu 核心包找漏洞),呼吁社区设计下一代 benchmark 时优先缓解
+
+## 附:精读中发现的细节存疑点
+
+- 摘要与 §1 正文对 8B/16B 的表述顺序相反(数值一致)【p1 vs p4】
+- "V4-Pro ≈ 1.6T 总参数"可由 p24 Table 1 直接证实(Backbone Params 1.6T),非推断
+- effort 训练的 k₀、τ、C_max、L_norm 具体数值全文未给出【p30】
+- Figure 6(BPB)与 Figure 7-12 的精确曲线值需查原图,文本提取不含
+
+
+## 文献版本说明
+
+本文所引 DeepSeek-V4.1-Flash 技术报告为原笔记记录的 2026-09-10、51 页版本（文件名 `DeepSeek_V41_Tech_Report.pdf`），页码对应这一版本。本次整理未获得可独立确认的公开下载链接，未将 PDF 打包进本站；涉及该报告的数值沿用原笔记，仍需对照原文复核。
