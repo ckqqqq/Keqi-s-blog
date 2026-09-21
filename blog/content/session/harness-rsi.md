@@ -1,7 +1,6 @@
 ---
 title: "Harness Engineering for Self-Improvement （RSI） 深度解读"
 date: 2026-07-10
-lastmod: 2026-09-21
 draft: false
 visibility: public
 categories: ["模型与评测"]

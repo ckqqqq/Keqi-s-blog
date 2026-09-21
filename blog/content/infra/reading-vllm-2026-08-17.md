@@ -1,7 +1,6 @@
 ---
 title: "分布式逐层卸载：权重分片、预取与 AllGather"
 date: 2026-08-17
-lastmod: 2026-09-21
 visibility: public
 draft: false
 categories: ["缓存与存储"]

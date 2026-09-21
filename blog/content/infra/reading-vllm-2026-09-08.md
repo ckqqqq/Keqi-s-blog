@@ -1,7 +1,6 @@
 ---
 title: "混合稀疏卸载：根据显存压力选择驻留路径"
 date: 2026-09-08
-lastmod: 2026-09-21
 visibility: public
 draft: false
 categories: ["缓存与存储"]

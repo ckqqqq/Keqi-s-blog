@@ -1,7 +1,6 @@
 ---
 title: "SWA 有效感受野：O(W) 上界的假设与推导"
 date: 2026-09-15
-lastmod: 2026-09-21
 draft: false
 visibility: public
 categories: ["注意力算法"]

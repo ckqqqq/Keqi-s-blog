@@ -1,7 +1,6 @@
 ---
 title: "从模型架构到系统约束：V4.1 工程问题映射"
 date: 2026-09-15
-lastmod: 2026-09-21
 draft: false
 visibility: public
 categories: ["系统架构"]
