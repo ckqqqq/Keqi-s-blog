@@ -1,0 +1,9 @@
+/public/
+/resources/
+/.hugo_build.lock
+.DS_Store
+# Private originals belong outside this repository; these are accidental-copy guards.
+/private/
+/research/
+*.pdf
+*.zip
