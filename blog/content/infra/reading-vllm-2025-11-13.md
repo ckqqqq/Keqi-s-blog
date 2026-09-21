@@ -1,6 +1,7 @@
 ---
 title: "共享内存 IPC：减少多进程推理的重复数据搬运"
 date: 2025-11-13
+lastmod: 2026-09-21
 visibility: public
 draft: false
 categories: ["推理引擎"]

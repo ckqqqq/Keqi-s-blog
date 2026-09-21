@@ -1,6 +1,7 @@
 ---
 title: "KV Offloading Connector：异步卸载与重算的取舍"
 date: 2026-01-08
+lastmod: 2026-09-21
 visibility: public
 draft: false
 categories: ["缓存与存储"]

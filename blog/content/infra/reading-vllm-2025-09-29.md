@@ -1,6 +1,7 @@
 ---
 title: "vLLM DSA：索引器与稀疏注意力如何接入引擎"
 date: 2025-09-29
+lastmod: 2026-09-21
 visibility: public
 draft: false
 categories: ["注意力算法"]

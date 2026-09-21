@@ -1,6 +1,7 @@
 ---
 title: "vLLM PR #56214：模型接入的五处语义差异"
 date: 2026-09-15
+lastmod: 2026-09-21
 draft: false
 visibility: public
 categories: ["推理引擎"]
