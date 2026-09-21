@@ -452,3 +452,46 @@ base-b:    6501.85, 6849.70, 6691.80   ← base-b 最高 6849
 - **`sgl_kernel` 的 push-plane 协议实现**（`communicator.cuh`）不在本 PR 内，无法核对
 
 ---
+
+## 7. 可复现的验证问题
+
+**【推断】按门槛排序**：
+
+1. **读 `all_reduce_fusion.cuh` 的头部注释**（约 40 行）—— 它是**一份完整的融合 kernel 设计文档**：数据流、数值等价性、push-plane 协议、phase counter 兼容性。**这是最好的学习材料，比任何教程都值。**
+
+2. **把 `candidate_blocks.py`（115 行 Triton）跑通并读懂** —— 它直接对应 V4.1 §2.3.2 的 Hierarchical Sparse Indexer 的 block 级选择。**这是我们之前讨论过的方向，而且有真实生产实现可对照。**
+
+3. **`mhc.py` 的 `_num_stages_for`（11 行）** —— 最小改动、最清晰的价值示范：**只改内存调度、不改归约顺序**，就能拿到收益。
+
+4. **⭐ 最有价值的方向：把这些优化搬到 H20**。理由：
+   - 本 PR 的守卫里 `is_blackwell` 直接排除了 Hopper → **H100/H20 上这些优化都不生效**
+   - 按 `AGENTS.md` §5.2，**H20 是"算力稀缺、带宽宽裕"的相反画像**
+   - 而 §4.1 的结论（瓶颈在 launch 和布局，不在算力）**在 H20 上只会更成立**（算力更少 → 调度开销占比更高）
+
+
+---
+
+## 8. 证据分级与来源
+
+| 结论 | 来源 | 等级 |
+|---|---|---|
+| PR 元数据、性能表、launch 表、精度表 | GitHub API 的 PR body | **【原文】** |
+| kernel 设计细节（push plane、+0.0 处理、舍入点） | 分支源码 `all_reduce_fusion.cuh` 注释 | **【码】** |
+| `_num_stages_for` / `_apply_wo_a_bf16_matmul` / `prefer_custom_dsv41` 条件 | 分支源码 | **【码】** |
+| 三个 commit 的演进 | GitHub API commits | **【原文】** |
+| "加速主要来自 launch 减少"、"H20 是空白"等 | 我的推理 | **【推断】** |
+| 原版 K3 kernel、push-plane 协议实现 | **未看到** | **无法确认** |
+| PR 数字本身的正确性 | **无 B300 环境** | **无法验证** |
+
+**未确认项**：
+1. `csrc/kimi_k3/comm/ar_fusion.cuh` 原版内容（不在本 PR）
+2. `sgl_kernel/distributed/communicator.cuh` 的 push-plane 实现
+3. 作者身份的具体背景（BBuf 是 SGLang 常见贡献者，但我未核实其所属）
+4. 该 PR 是否随后被 cherry-pick 到 main
+
+
+## 文献版本说明
+
+本文所引 DeepSeek-V4.1-Flash 技术报告为原笔记记录的 2026-09-10、51 页版本（文件名 `DeepSeek_V41_Tech_Report.pdf`），页码对应这一版本。本次整理未获得可独立确认的公开下载链接，未将 PDF 打包进本站；涉及该报告的数值沿用原笔记，仍需对照原文复核。
+
+上游入口：[SGLang PR #38879](https://github.com/sgl-project/sglang/pull/38879)。
