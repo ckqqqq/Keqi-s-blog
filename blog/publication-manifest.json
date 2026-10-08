@@ -1,6 +1,7 @@
 {
   "baseURL": "https://ckqqqq.github.io/blog/",
   "articles": [
+    "algorithms/2026-10-08-factors-of-agent-iteration.md",
     "algorithms/start-here.md",
     "algorithms/swa-receptive-field.md",
     "infra/2026-08-21-async-rl-infrastructure.md",
