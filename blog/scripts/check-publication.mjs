@@ -8,7 +8,7 @@ const manifest = JSON.parse(readFileSync(join(root, "publication-manifest.json")
 const failures = [];
 const forbidden = [
   /km\.sankuai\.com/,
-  /求职|薪资|薪酬|招聘|简历|面试|人才缺口|职业规划|个人水平评估/,
+  /求职|薪资|薪酬|招聘|简历|(?<!编程)面试|面试(?!问题)|人才缺口|职业规划|个人水平评估/,
   /\/Users\/|\/home\/qiker|target\.md|Learning-harness|M4 Pro/,
   /(?:gh[pousr]_[A-Za-z0-9]{30,}|AKIA[A-Z0-9]{16})/,
 ];

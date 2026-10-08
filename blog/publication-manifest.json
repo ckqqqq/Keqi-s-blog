@@ -32,7 +32,8 @@
     "infra/vllm-pr56214-analysis.md",
     "infra/vllm-pr56214-code.md",
     "session/harness-rsi.md",
-    "session/frontier-model-trends.md"
+    "session/frontier-model-trends.md",
+    "infra/big-blob-of-compute.md"
   ],
   "navigation": [
     "infra/_index.md",
